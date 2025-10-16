@@ -14,7 +14,7 @@ import {
   FhevmDecryptionSignature,
   type FhevmInstance,
   type GenericStringStorage,
-} from "@fhevm/react";
+} from "../../fhevm-react";
 
 /*
   The following two files are automatically generated when `npx hardhat deploy` is called

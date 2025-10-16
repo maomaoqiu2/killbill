@@ -35,13 +35,13 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       accounts: {
-        mnemonic: MNEMONIC,
+        mnemonic: "test test test test test test test test test test test junk",
       },
       chainId: 31337,
     },
     anvil: {
       accounts: {
-        mnemonic: MNEMONIC,
+        mnemonic: "test test test test test test test test test test test junk",
         path: "m/44'/60'/0'/0/",
         count: 10,
       },

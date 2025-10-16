@@ -1,6 +1,6 @@
 import { DeployFunction } from "hardhat-deploy/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { postDeploy } from "postdeploy";
+import { postDeploy } from "../../postdeploy";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer } = await hre.getNamedAccounts();
@@ -9,7 +9,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = await hre.getChainId();
   const chainName = hre.network.name;
 
-  const contractName = "FHECounter";
+  const contractName = "KillBillGame";
   const deployed = await deploy(contractName, {
     from: deployer,
     log: true,
@@ -27,5 +27,5 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
 export default func;
 
-func.id = "deploy_fheCounter"; // id required to prevent reexecution
-func.tags = ["FHECounter"];
+func.id = "deploy_KillBillGame"; // id required to prevent reexecution
+func.tags = ["KillBillGame"];
