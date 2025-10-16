@@ -7,7 +7,7 @@ import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 /// @title Kill Bill Game - A FHE-based blockchain game
 /// @author Based on fhevm-hardhat-template
 /// @notice A game where players attack Bill 3 times with random damage, then verify if Bill is defeated
-contract KillBillGame is SepoliaConfig {
+contract KillBillGameSepolia is SepoliaConfig {
     /// @notice Game state for each player
     struct GameSession {
         euint32 billHealth;      // Bill's encrypted health
