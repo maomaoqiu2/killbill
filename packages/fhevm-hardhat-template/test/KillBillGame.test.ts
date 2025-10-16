@@ -549,10 +549,10 @@ describe("KillBillGame", function () {
   });
 
   describe("Edge Cases", function () {
-    it("should handle getBillHealth for non-existent game", async function () {
-      await expect(
-        killBillContract.connect(signers.alice).getBillHealth()
-      ).to.be.revertedWith("No active game");
+    it("should return zero hash for getBillHealth when no game exists", async function () {
+      // Should not revert, just return zero hash
+      const health = await killBillContract.connect(signers.alice).getBillHealth();
+      expect(health).to.eq(ethers.ZeroHash);
     });
 
     it("should return correct initial game session for new player", async function () {

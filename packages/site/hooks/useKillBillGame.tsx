@@ -91,7 +91,6 @@ export const useKillBillGame = (parameters: {
   const [clearHealth, setClearHealth] = useState<ClearHealthType | undefined>(undefined);
   const clearHealthRef = useRef<ClearHealthType>(undefined);
   const [totalDefeats, setTotalDefeats] = useState<number>(0);
-  const [lastDamage, setLastDamage] = useState<number | undefined>(undefined);
   
   const [isInitializing, setIsInitializing] = useState<boolean>(false);
   const [isAttacking, setIsAttacking] = useState<boolean>(false);
@@ -190,20 +189,24 @@ export const useKillBillGame = (parameters: {
           });
           setTotalDefeats(Number(defeats));
           
-          // Also refresh health handle if game is active
-          if (session.gameActive) {
-            contract.getBillHealth().then((health: string) => {
+          // Get health handle (works even if game is not active now)
+          contract.getBillHealth().then((health: string) => {
+            if (health && health !== ethers.ZeroHash) {
               setHealthHandle(health);
-            }).catch(() => {
+            } else {
               setHealthHandle(undefined);
-            });
-          }
+            }
+          }).catch(() => {
+            // Health handle not available, that's ok
+            setHealthHandle(undefined);
+          });
         }
 
         isRefreshingRef.current = false;
         setIsRefreshing(false);
       })
       .catch((e) => {
+        console.error("[useKillBillGame] Refresh error:", e);
         setMessage("Failed to refresh game session! error=" + e);
         isRefreshingRef.current = false;
         setIsRefreshing(false);
@@ -236,6 +239,11 @@ export const useKillBillGame = (parameters: {
     if (!killBillGame.address || !ethersSigner) {
       return;
     }
+
+    // Clear previous game state
+    setClearHealth(undefined);
+    clearHealthRef.current = undefined;
+    setHealthHandle(undefined);
 
     const thisChainId = chainId;
     const thisContractAddress = killBillGame.address;
@@ -327,25 +335,7 @@ export const useKillBillGame = (parameters: {
         setMessage(`Waiting for tx: ${tx.hash}...`);
 
         const receipt = await tx.wait();
-        
-        // Parse event to get damage
-        const event = receipt?.logs.find((log: any) => {
-          try {
-            const parsed = contract.interface.parseLog(log);
-            return parsed?.name === "AttackPerformed";
-          } catch {
-            return false;
-          }
-        });
-        
-        if (event) {
-          const parsed = contract.interface.parseLog(event);
-          const damage = Number(parsed?.args[2]);
-          setLastDamage(damage);
-          setMessage(`Attack dealt ${damage} damage!`);
-        } else {
-          setMessage(`Attack completed! Status=${receipt?.status}`);
-        }
+        setMessage(`Attack completed! Status=${receipt?.status}`);
 
         if (isStale()) {
           setMessage("Ignoring stale attack");
@@ -365,7 +355,151 @@ export const useKillBillGame = (parameters: {
   }, [killBillGame.address, killBillGame.abi, ethersSigner, chainId, gameSession, refreshGameSession, sameChain, sameSigner]);
 
   //////////////////////////////////////////////////////////////////////////////
-  // Verify Defeat
+  // Decrypt and Verify (Combined)
+  //////////////////////////////////////////////////////////////////////////////
+
+  const canDecryptAndVerify = useMemo(() => {
+    return (
+      killBillGame.address &&
+      instance &&
+      ethersSigner &&
+      gameSession?.gameActive &&
+      gameSession?.attackCount === 3 &&
+      !isVerifying &&
+      !isDecrypting
+    );
+  }, [killBillGame.address, instance, ethersSigner, gameSession, isVerifying, isDecrypting]);
+
+  const decryptAndVerify = useCallback(() => {
+    if (isVerifyingRef.current || isDecryptingRef.current) {
+      return;
+    }
+
+    if (!killBillGame.address || !instance || !ethersSigner || !gameSession?.gameActive) {
+      return;
+    }
+
+    const thisChainId = chainId;
+    const thisContractAddress = killBillGame.address;
+    const thisEthersSigner = ethersSigner;
+    const contract = new ethers.Contract(
+      thisContractAddress,
+      killBillGame.abi,
+      thisEthersSigner
+    );
+
+    isVerifyingRef.current = true;
+    isDecryptingRef.current = true;
+    setIsVerifying(true);
+    setIsDecrypting(true);
+    setMessage("Step 1/3: Getting health handle...");
+
+    const run = async () => {
+      const isStale = () =>
+        thisContractAddress !== killBillGameRef.current?.address ||
+        !sameChain.current(thisChainId) ||
+        !sameSigner.current(thisEthersSigner);
+
+      try {
+        // Step 1: Get health handle
+        const thisHealthHandle = await contract.getBillHealth();
+        setHealthHandle(thisHealthHandle);
+        setMessage("Step 2/3: Decrypting health...");
+
+        if (isStale()) {
+          setMessage("Ignoring stale operation");
+          return;
+        }
+
+        // Step 2: Decrypt health
+        const sig: FhevmDecryptionSignature | null =
+          await FhevmDecryptionSignature.loadOrSign(
+            instance,
+            [killBillGame.address as `0x${string}`],
+            ethersSigner,
+            fhevmDecryptionSignatureStorage
+          );
+
+        if (!sig) {
+          setMessage("Unable to build FHEVM decryption signature");
+          return;
+        }
+
+        if (isStale()) {
+          setMessage("Ignoring stale operation");
+          return;
+        }
+
+        const res = await instance.userDecrypt(
+          [{ handle: thisHealthHandle, contractAddress: thisContractAddress }],
+          sig.privateKey,
+          sig.publicKey,
+          sig.signature,
+          sig.contractAddresses,
+          sig.userAddress,
+          sig.startTimestamp,
+          sig.durationDays
+        );
+
+        if (isStale()) {
+          setMessage("Ignoring stale operation");
+          return;
+        }
+
+        const decryptedHealth = res[thisHealthHandle];
+        setClearHealth({ handle: thisHealthHandle, clear: decryptedHealth });
+        clearHealthRef.current = {
+          handle: thisHealthHandle,
+          clear: decryptedHealth,
+        };
+
+        setMessage(`Step 3/3: Verifying defeat... (Health: ${decryptedHealth} HP)`);
+
+        // Step 3: Verify defeat
+        const tx: ethers.TransactionResponse = await contract.verifyDefeat();
+        setMessage(`Waiting for verification tx: ${tx.hash}...`);
+
+        const receipt = await tx.wait();
+
+        if (isStale()) {
+          setMessage("Ignoring stale verification");
+          return;
+        }
+
+        refreshGameSession();
+
+        // Show final result
+        if (Number(decryptedHealth) <= 0) {
+          setMessage(`🎉 BILL IS DEAD! Final Health: ${decryptedHealth} HP`);
+        } else {
+          setMessage(`💔 BILL SURVIVED! Remaining Health: ${decryptedHealth} HP`);
+        }
+      } catch (e: any) {
+        setMessage(`Failed: ${e.message}`);
+      } finally {
+        isVerifyingRef.current = false;
+        isDecryptingRef.current = false;
+        setIsVerifying(false);
+        setIsDecrypting(false);
+      }
+    };
+
+    run();
+  }, [
+    fhevmDecryptionSignatureStorage,
+    ethersSigner,
+    killBillGame.address,
+    killBillGame.abi,
+    instance,
+    chainId,
+    gameSession,
+    refreshGameSession,
+    sameChain,
+    sameSigner,
+  ]);
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Verify Defeat (Original - Keep for backward compatibility)
   //////////////////////////////////////////////////////////////////////////////
 
   const canVerify = useMemo(() => {
@@ -551,7 +685,6 @@ export const useKillBillGame = (parameters: {
     isDeployed,
     gameSession,
     totalDefeats,
-    lastDamage,
     healthHandle,
     clearHealth: clearHealth?.clear,
     isHealthDecrypted,
@@ -559,11 +692,13 @@ export const useKillBillGame = (parameters: {
     canAttack,
     canVerify,
     canDecrypt,
+    canDecryptAndVerify,
     canRefresh,
     initializeGame,
     attackBill,
     verifyDefeat,
     decryptHealth,
+    decryptAndVerify,
     refreshGameSession,
     isInitializing,
     isAttacking,

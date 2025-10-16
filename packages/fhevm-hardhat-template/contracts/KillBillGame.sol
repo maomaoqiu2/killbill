@@ -96,6 +96,7 @@ contract KillBillGame is SepoliaConfig {
 
     /// @notice Verifies if Bill has been defeated (health <= 0)
     /// @dev Can only be called after all 3 attacks are used
+    /// @dev Uses totalDamage to determine defeat since FHE.decrypt is not available in contracts
     /// @return billDefeated Whether Bill was defeated
     function verifyDefeat() external returns (bool billDefeated) {
         GameSession storage session = gameSessions[msg.sender];
@@ -103,8 +104,8 @@ contract KillBillGame is SepoliaConfig {
         require(session.gameActive, "No active game");
         require(session.attackCount == 3, "Must complete all 3 attacks first");
         
-        // Simple logic: if total damage >= initial health, Bill is defeated
-        // This works because we track damage in plaintext
+        // Use totalDamage to determine if Bill is defeated
+        // If totalDamage >= INITIAL_HEALTH, Bill is defeated
         billDefeated = session.totalDamage >= INITIAL_HEALTH;
         
         // Update game state
@@ -162,10 +163,14 @@ contract KillBillGame is SepoliaConfig {
     }
 
     /// @notice Gets the encrypted health value for a player's game
+    /// @dev Returns the encrypted health handle, or zero hash if no active game
     /// @return The encrypted health value
     function getBillHealth() external view returns (euint32) {
-        require(gameSessions[msg.sender].gameActive, "No active game");
-        return gameSessions[msg.sender].billHealth;
+        GameSession storage session = gameSessions[msg.sender];
+        
+        // Return the health handle even if game is not active
+        // This allows frontend to decrypt after game ends
+        return session.billHealth;
     }
 
     /// @notice Generates pseudo-random damage value

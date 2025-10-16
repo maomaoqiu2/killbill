@@ -70,6 +70,7 @@ export const KillBillGameDemo = () => {
   const titleClass = "font-black text-4xl text-black mb-4 uppercase tracking-wider";
   const sectionClass = "bg-yellow-400 border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]";
 
+  // Loading state for FHEvm initialization
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-yellow-400 flex items-center justify-center">
@@ -86,17 +87,46 @@ export const KillBillGameDemo = () => {
     );
   }
 
-    if (game.isDeployed === false) {
-        console.log("game", game);
-        console.log("chainid", chainId);
+  // FHEvm Loading State
+  if (fhevmStatus !== "ready") {
+    return (
+      <div className="min-h-screen bg-yellow-400 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="font-black text-6xl text-black mb-8 uppercase tracking-wider">
+            KILL BILL
+          </h1>
+          <div className="bg-black border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-yellow-400"></div>
+            </div>
+            <p className="text-yellow-400 font-black text-2xl mb-2">INITIALIZING FHE</p>
+            <p className="text-yellow-400 font-bold text-lg">
+              {fhevmStatus === "loading" && "Loading encryption system..."}
+              {fhevmStatus === "error" && "Error loading encryption system"}
+              {fhevmStatus === "idle" && "Preparing..."}
+            </p>
+            {fhevmError && (
+              <p className="text-red-500 font-bold text-sm mt-4">
+                Error: {fhevmError.message}
+              </p>
+            )}
+          </div>
+          <p className="text-black font-bold text-sm max-w-md mx-auto">
+            Please wait while we initialize the Fully Homomorphic Encryption system.
+            This may take a few moments...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (game.isDeployed === false) {
     return errorNotDeployed(chainId);
   }
 
   const renderBillImage = () => {
-    const remainingHealth = game.gameSession?.totalDamage 
-      ? 1000 - game.gameSession.totalDamage 
-      : 1000;
-    const healthPercent = Math.max(0, (remainingHealth / 1000) * 100);
+    // Don't show health bar if health is encrypted
+    const showHealthBar = game.isHealthDecrypted && game.clearHealth !== undefined;
     
     return (
       <div className="relative">
@@ -106,12 +136,17 @@ export const KillBillGameDemo = () => {
             <div className="font-black text-white text-2xl">BILL</div>
           </div>
         </div>
-        {game.gameSession?.gameActive && (
+        {game.gameSession?.gameActive && showHealthBar && (
           <div className="absolute bottom-0 left-0 right-0 h-2 bg-gray-700 border-2 border-black">
             <div 
               className="h-full bg-red-600 transition-all duration-500"
-              style={{ width: `${healthPercent}%` }}
+              style={{ width: `${Math.max(0, (Number(game.clearHealth) / 1000) * 100)}%` }}
             />
+          </div>
+        )}
+        {game.gameSession?.gameActive && !showHealthBar && (
+          <div className="absolute bottom-0 left-0 right-0 h-2 bg-gray-700 border-2 border-black">
+            <div className="h-full bg-purple-600 animate-pulse" style={{ width: '100%' }} />
           </div>
         )}
       </div>
@@ -134,9 +169,11 @@ export const KillBillGameDemo = () => {
           <p className="font-black text-6xl text-yellow-400 text-center animate-pulse">
             BILL IS DEAD!
           </p>
-          <p className="text-2xl text-white text-center mt-4 font-bold">
-            Total Damage: {game.gameSession.totalDamage}
-          </p>
+          {game.isHealthDecrypted && game.clearHealth !== undefined && (
+            <p className="text-2xl text-white text-center mt-4 font-bold">
+              Final Health: {String(game.clearHealth)} HP
+            </p>
+          )}
         </div>
       );
     }
@@ -147,32 +184,23 @@ export const KillBillGameDemo = () => {
           <p className="font-black text-4xl text-yellow-400 text-center">
             BILL SURVIVED!
           </p>
-          <p className="text-xl text-white text-center mt-4 font-bold">
-            Total Damage: {game.gameSession.totalDamage} / 1000
-          </p>
+          {game.isHealthDecrypted && game.clearHealth !== undefined && (
+            <p className="text-xl text-white text-center mt-4 font-bold">
+              Remaining Health: {String(game.clearHealth)} HP
+            </p>
+          )}
         </div>
       );
     }
 
     return (
       <div className={sectionClass}>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="font-black text-xl">ATTACKS:</p>
-            <p className="text-4xl font-bold">{game.gameSession.attackCount} / 3</p>
-          </div>
-          <div>
-            <p className="font-black text-xl">TOTAL DAMAGE:</p>
-            <p className="text-4xl font-bold text-red-600">{game.gameSession.totalDamage}</p>
-          </div>
+        <div className="text-center">
+          <p className="font-black text-xl mb-2">ATTACKS COMPLETED</p>
+          <p className="text-6xl font-bold mb-4">{game.gameSession.attackCount} / 3</p>
+          <p className="font-black text-xl mb-2">BILL'S HEALTH</p>
+          <p className="text-6xl font-bold text-purple-600">??? HP</p>
         </div>
-        {game.lastDamage && (
-          <div className="mt-4 bg-red-600 border-2 border-black p-3">
-            <p className="text-white font-bold text-center text-xl">
-              Last Attack: -{game.lastDamage} HP
-            </p>
-          </div>
-        )}
       </div>
     );
   };
@@ -254,33 +282,36 @@ export const KillBillGameDemo = () => {
           </div>
         )}
 
-        {/* Verify Button */}
-        {game.canVerify && (
+        {/* Verify Button - replaced with Decrypt and Verify */}
+        {game.canDecryptAndVerify && (
           <button
             className={verifyButtonClass + " w-full"}
-            onClick={game.verifyDefeat}
-            disabled={game.isVerifying}
+            onClick={game.decryptAndVerify}
+            disabled={game.isVerifying || game.isDecrypting}
           >
-            {game.isVerifying ? "VERIFYING..." : "VERIFY KILL"}
+            {game.isVerifying || game.isDecrypting 
+              ? game.message || "PROCESSING..." 
+              : "🔓 DECRYPT & VERIFY KILL"
+            }
           </button>
         )}
 
-        {/* Decrypt Health Button (Optional) */}
-        {game.canDecrypt && (
-          <button
-            className={buttonClass + " w-full bg-purple-500 text-white"}
-            onClick={game.decryptHealth}
-            disabled={game.isDecrypting}
-          >
-            {game.isDecrypting ? "DECRYPTING..." : "DECRYPT BILL'S HEALTH"}
-          </button>
-        )}
-
-        {/* Show Decrypted Health */}
-        {game.isHealthDecrypted && game.clearHealth !== undefined && (
-          <div className="bg-purple-500 border-4 border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <p className="text-white font-bold text-center text-xl">
-              Decrypted Health: {String(game.clearHealth)} HP
+        {/* Show result after verification */}
+        {!game.gameSession?.gameActive && game.isHealthDecrypted && game.clearHealth !== undefined && (
+          <div className={
+            game.gameSession?.billDefeated 
+              ? "bg-red-600 border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+              : "bg-black border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+          }>
+            <p className={
+              game.gameSession?.billDefeated
+                ? "text-yellow-400 font-black text-3xl text-center"
+                : "text-yellow-400 font-black text-3xl text-center"
+            }>
+              {game.gameSession?.billDefeated ? "🎉 VICTORY!" : "💔 DEFEAT!"}
+            </p>
+            <p className="text-white font-bold text-xl text-center mt-3">
+              Final Health: {String(game.clearHealth)} HP
             </p>
           </div>
         )}
@@ -318,9 +349,12 @@ export const KillBillGameDemo = () => {
           <div className="mt-4 space-y-2 font-mono text-sm">
             <p><strong>Game Active:</strong> {game.gameSession?.gameActive ? "✓" : "✗"}</p>
             <p><strong>Attack Count:</strong> {game.gameSession?.attackCount || 0}</p>
-            <p><strong>Total Damage:</strong> {game.gameSession?.totalDamage || 0}</p>
             <p><strong>Bill Defeated:</strong> {game.gameSession?.billDefeated ? "✓" : "✗"}</p>
             <p><strong>Health Handle:</strong> {game.healthHandle || "None"}</p>
+            <p><strong>Health Decrypted:</strong> {game.isHealthDecrypted ? "✓" : "✗"}</p>
+            {game.isHealthDecrypted && (
+              <p><strong>Clear Health:</strong> {String(game.clearHealth)} HP</p>
+            )}
             <p><strong>Can Initialize:</strong> {game.canInitialize ? "✓" : "✗"}</p>
             <p><strong>Can Attack:</strong> {game.canAttack ? "✓" : "✗"}</p>
             <p><strong>Can Verify:</strong> {game.canVerify ? "✓" : "✗"}</p>
