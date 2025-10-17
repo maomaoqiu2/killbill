@@ -4,8 +4,8 @@ import { Providers } from "./providers";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "Zama FHEVM SDK Quickstart",
-  description: "Zama FHEVM SDK Quickstart app",
+  title: "killbill game on Zama",
+  description: "killbill game on Zama",
 };
 
 export default async function RootLayout({

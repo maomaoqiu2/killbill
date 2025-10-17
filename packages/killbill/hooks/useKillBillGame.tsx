@@ -115,9 +115,11 @@ export const useKillBillGame = (parameters: {
   const killBillGame = useMemo(() => {
     const c = getKillBillGameByChainId(chainId);
     killBillGameRef.current = c;
-
+    console.log("---------c", c)
     if (!c.address) {
       setMessage(`KillBillGame deployment not found for chainId=${chainId}.`);
+    } else {
+      setMessage("Please start the game, Have fun!");
     }
 
     return c;

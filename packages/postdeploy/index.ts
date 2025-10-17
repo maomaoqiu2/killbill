@@ -168,7 +168,7 @@ export function postDeploy(chainName: string, contractName: string) {
   saveDeployments(
     referenceABIJson,
     contractName,
-    path.resolve("../site/abi"),
+    path.resolve("../killbill/abi"),
     sepoliaDeployment,
     localhostDeployment
   );
