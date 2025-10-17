@@ -166,7 +166,7 @@ export const KillBillGameDemo = () => {
     if (!game.gameSession.gameActive && game.gameSession.billDefeated) {
       return (
         <div className="bg-red-600 border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-          <p className="font-black text-6xl text-yellow-400 text-center animate-pulse">
+          <p className="font-black text-6xl text-yellow-400 text-center animate-pulse break-words">
             BILL IS DEAD!
           </p>
           {game.isHealthDecrypted && game.clearHealth !== undefined && (
@@ -208,7 +208,7 @@ export const KillBillGameDemo = () => {
   return (
     <div className="min-h-screen bg-yellow-400 py-8">
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-8">
+      <div className="max-w-full mx-auto mb-8">
         <div className="bg-black border-4 border-black p-6 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
           <h1 className="font-black text-6xl text-yellow-400 text-center uppercase tracking-wider">
             KILL BILL
@@ -220,9 +220,9 @@ export const KillBillGameDemo = () => {
       </div>
 
       {/* Main Game Area */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      <div className="max-w-full mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         {/* Bill Image */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center min-w-0">
           <div className={sectionClass}>
             {renderBillImage()}
             <div className="mt-4 text-center">
@@ -233,7 +233,7 @@ export const KillBillGameDemo = () => {
         </div>
 
         {/* Game Status */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           {renderGameStatus()}
           
           {/* Global Stats */}
@@ -247,7 +247,7 @@ export const KillBillGameDemo = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="max-w-6xl mx-auto space-y-4">
+      <div className="max-w-full  w-full mx-auto space-y-4">
         {/* Initialize / Reset Game */}
         {game.canInitialize && (
           <button
@@ -261,7 +261,7 @@ export const KillBillGameDemo = () => {
 
         {/* Attack Buttons */}
         {game.gameSession?.gameActive && game.gameSession.attackCount < 3 && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 w-full">
             {[1, 2, 3].map((attackNum) => (
               <button
                 key={attackNum}
@@ -299,9 +299,11 @@ export const KillBillGameDemo = () => {
         {/* Show result after verification */}
         {!game.gameSession?.gameActive && game.isHealthDecrypted && game.clearHealth !== undefined && (
           <div className={
-            game.gameSession?.billDefeated 
-              ? "bg-red-600 border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
-              : "bg-black border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+            `w-full ${  // 👈 添加 w-full
+              game.gameSession?.billDefeated 
+                ? "bg-red-600 border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+                : "bg-black border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+            }`
           }>
             <p className={
               game.gameSession?.billDefeated
@@ -318,7 +320,7 @@ export const KillBillGameDemo = () => {
       </div>
 
       {/* Debug Info & Contract Details */}
-      <div className="max-w-6xl mx-auto mt-8 space-y-4">
+      <div className="max-w-full mx-auto mt-8 space-y-4">
         <details className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
           <summary className="font-black text-2xl cursor-pointer uppercase">
             Contract Info
@@ -373,7 +375,7 @@ export const KillBillGameDemo = () => {
       </div>
 
       {/* Footer */}
-      <div className="max-w-6xl mx-auto mt-12 text-center">
+      <div className="max-w-full mx-auto mt-12 text-center">
         <p className="text-black font-bold text-lg">
           A game powered by Fully Homomorphic Encryption
         </p>
