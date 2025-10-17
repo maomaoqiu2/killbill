@@ -89,7 +89,7 @@ export const useKillBillGame = (parameters: {
   const [gameSession, setGameSession] = useState<GameSessionType | undefined>(undefined);
   const [healthHandle, setHealthHandle] = useState<string | undefined>(undefined);
   const [clearHealth, setClearHealth] = useState<ClearHealthType | undefined>(undefined);
-  const clearHealthRef = useRef<ClearHealthType>(undefined);
+  const clearHealthRef = useRef<ClearHealthType | undefined>(undefined);
   const [totalDefeats, setTotalDefeats] = useState<number>(0);
   
   const [isInitializing, setIsInitializing] = useState<boolean>(false);
@@ -115,10 +115,13 @@ export const useKillBillGame = (parameters: {
   const killBillGame = useMemo(() => {
     const c = getKillBillGameByChainId(chainId);
     killBillGameRef.current = c;
-    console.log("---------c", c)
-    if (!c.address) {
+    console.log("---------c", c);
+    
+    if (chainId && !c.address) {
+      // 只有在 chainId 存在但找不到地址时才报错
       setMessage(`KillBillGame deployment not found for chainId=${chainId}.`);
-    } else {
+    } else if (c.address) {
+      // 有地址时显示欢迎信息
       setMessage("Please start the game, Have fun!");
     }
 
@@ -191,17 +194,31 @@ export const useKillBillGame = (parameters: {
           });
           setTotalDefeats(Number(defeats));
           
-          // Get health handle (works even if game is not active now)
-          contract.getBillHealth().then((health: string) => {
-            if (health && health !== ethers.ZeroHash) {
-              setHealthHandle(health);
-            } else {
+          // ✅ 修复：只在游戏活跃时获取并清空 health handle
+          // 游戏结束后保持 clearHealth 状态
+          if (session.gameActive) {
+            contract.getBillHealth().then((health: string) => {
+              if (health && health !== ethers.ZeroHash) {
+                setHealthHandle(health);
+              } else {
+                setHealthHandle(undefined);
+              }
+            }).catch(() => {
               setHealthHandle(undefined);
+            });
+          } else {
+            // 游戏已结束，保持现有的 health handle 和 clearHealth
+            // 只在还没有 handle 时才去获取
+            if (!healthHandle) {
+              contract.getBillHealth().then((health: string) => {
+                if (health && health !== ethers.ZeroHash) {
+                  setHealthHandle(health);
+                }
+              }).catch(() => {
+                // 忽略错误
+              });
             }
-          }).catch(() => {
-            // Health handle not available, that's ok
-            setHealthHandle(undefined);
-          });
+          }
         }
 
         isRefreshingRef.current = false;
@@ -213,7 +230,7 @@ export const useKillBillGame = (parameters: {
         isRefreshingRef.current = false;
         setIsRefreshing(false);
       });
-  }, [ethersReadonlyProvider, ethersSigner, sameChain]);
+  }, [ethersReadonlyProvider, ethersSigner, sameChain, healthHandle]);
 
   // Auto refresh
   useEffect(() => {
@@ -242,10 +259,11 @@ export const useKillBillGame = (parameters: {
       return;
     }
 
-    // Clear previous game state
+    // ✅ 清空上一局游戏的所有状态
     setClearHealth(undefined);
     clearHealthRef.current = undefined;
     setHealthHandle(undefined);
+    setMessage(""); // 也清空之前的消息
 
     const thisChainId = chainId;
     const thisContractAddress = killBillGame.address;
@@ -402,6 +420,9 @@ export const useKillBillGame = (parameters: {
         !sameChain.current(thisChainId) ||
         !sameSigner.current(thisEthersSigner);
 
+      // ✅ 保存解密的健康值，避免被 refreshGameSession 清空
+      let decryptedHealth: string | bigint | boolean;
+
       try {
         // Step 1: Get health handle
         const thisHealthHandle = await contract.getBillHealth();
@@ -448,7 +469,9 @@ export const useKillBillGame = (parameters: {
           return;
         }
 
-        const decryptedHealth = res[thisHealthHandle];
+        decryptedHealth = res[thisHealthHandle];
+        
+        // ✅ 立即保存解密的健康值
         setClearHealth({ handle: thisHealthHandle, clear: decryptedHealth });
         clearHealthRef.current = {
           handle: thisHealthHandle,
@@ -468,14 +491,25 @@ export const useKillBillGame = (parameters: {
           return;
         }
 
+        // ✅ 先刷新游戏状态
         refreshGameSession();
 
-        // Show final result
-        if (Number(decryptedHealth) <= 0) {
-          setMessage(`🎉 BILL IS DEAD! Final Health: ${decryptedHealth} HP`);
-        } else {
-          setMessage(`💔 BILL SURVIVED! Remaining Health: ${decryptedHealth} HP`);
-        }
+        // ✅ 延迟一点再设置最终消息和确保 clearHealth 还在
+        // 这样可以确保 refreshGameSession 完成后，clearHealth 不会被清空
+        setTimeout(() => {
+          // 再次确保 clearHealth 被设置（防止被 refresh 清空）
+          if (clearHealthRef.current) {
+            setClearHealth(clearHealthRef.current);
+          }
+          
+          // 显示最终结果
+          if (Number(decryptedHealth) <= 0) {
+            setMessage(`🎉 BILL IS DEAD! Final Health: ${decryptedHealth} HP`);
+          } else {
+            setMessage(`💔 BILL SURVIVED! Remaining Health: ${decryptedHealth} HP`);
+          }
+        }, 200);
+        
       } catch (e: any) {
         setMessage(`Failed: ${e.message}`);
       } finally {
