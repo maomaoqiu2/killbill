@@ -37,7 +37,13 @@ const config: HardhatUserConfig = {
     hardhat: {
       accounts: {
         mnemonic: "test test test test test test test test test test test junk",
+        path: "m/44'/60'/0'/0/",
+        count: 10,
       },
+      chainId: 31337,
+    },
+    localhost: {
+      url: "http://127.0.0.1:8545",
       chainId: 31337,
     },
     anvil: {
@@ -49,21 +55,15 @@ const config: HardhatUserConfig = {
       chainId: 31337,
       url: "http://localhost:8545",
     },
-    // sepolia: {
-    //   accounts: {
-    //     mnemonic: MNEMONIC,
-    //     path: "m/44'/60'/0'/0/",
-    //     count: 10,
-    //   },
-    //   chainId: 11155111,
-    //   url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
-    // },
     sepolia: {
       url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : {
+        mnemonic: MNEMONIC,
+        path: "m/44'/60'/0'/0/",
+        count: 10,
+      },
       chainId: 11155111,
     },
-
   },
   paths: {
     artifacts: "./artifacts",
@@ -75,12 +75,8 @@ const config: HardhatUserConfig = {
     version: "0.8.27",
     settings: {
       metadata: {
-        // Not including the metadata hash
-        // https://github.com/paulrberg/hardhat-template/issues/31
         bytecodeHash: "none",
       },
-      // Disable the optimizer when debugging
-      // https://hardhat.org/hardhat-network/#solidity-optimizer-support
       optimizer: {
         enabled: true,
         runs: 800,
