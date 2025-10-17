@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import {FHE, euint32, ebool} from "@fhevm/solidity/lib/FHE.sol";
 import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 
-/// @title Kill Bill Game - A FHE-based blockchain game
+/// @title Kill Bill Game - A FHE-based blockchain game (Fixed underflow)
 /// @author Based on fhevm-hardhat-template
 /// @notice A game where players attack Bill 3 times with random damage, then verify if Bill is defeated
+/// @dev Fixed: Prevents underflow when damage exceeds remaining health
 contract KillBillGame is SepoliaConfig {
     /// @notice Game state for each player
     struct GameSession {
@@ -63,6 +64,7 @@ contract KillBillGame is SepoliaConfig {
 
     /// @notice Performs an attack on Bill with random damage
     /// @dev Generates pseudo-random damage and subtracts from Bill's health
+    /// @dev FIXED: Prevents underflow by checking if health >= damage before subtraction
     /// @return damage The amount of damage dealt
     function attackBill() external returns (uint32 damage) {
         GameSession storage session = gameSessions[msg.sender];
@@ -79,8 +81,25 @@ contract KillBillGame is SepoliaConfig {
         // Convert damage to encrypted value
         euint32 encryptedDamage = FHE.asEuint32(damage);
         
-        // Subtract damage from Bill's health
-        session.billHealth = FHE.sub(session.billHealth, encryptedDamage);
+        // ========== FIX: Prevent underflow ==========
+        // Check if current health >= damage
+        ebool healthGreaterOrEqual = FHE.ge(session.billHealth, encryptedDamage);
+        
+        // Calculate new health (might underflow if health < damage)
+        euint32 healthAfterDamage = FHE.sub(session.billHealth, encryptedDamage);
+        
+        // Create encrypted zero
+        euint32 zero = FHE.asEuint32(0);
+        
+        // Use FHE.select to choose:
+        // - If health >= damage: use the subtraction result
+        // - If health < damage: set health to 0
+        session.billHealth = FHE.select(
+            healthGreaterOrEqual,
+            healthAfterDamage,
+            zero
+        );
+        // ============================================
         
         // Increment attack count
         session.attackCount++;
@@ -129,8 +148,8 @@ contract KillBillGame is SepoliaConfig {
         GameSession storage session = gameSessions[msg.sender];
         require(!session.gameActive, "Game still active");
         
-        // In FHEVM, we would use FHE.decrypt here
-        // For now, we calculate: INITIAL_HEALTH - totalDamage
+        // Calculate remaining health based on total damage
+        // With the underflow fix, this calculation is now accurate
         if (session.totalDamage >= INITIAL_HEALTH) {
             return 0;
         }

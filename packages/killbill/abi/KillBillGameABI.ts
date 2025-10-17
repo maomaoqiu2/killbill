@@ -234,6 +234,19 @@ export const KillBillGameABI = {
     },
     {
       "inputs": [],
+      "name": "protocolId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "resetGame",
       "outputs": [],
       "stateMutability": "nonpayable",
