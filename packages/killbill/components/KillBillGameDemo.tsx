@@ -261,7 +261,7 @@ export const KillBillGameDemo = () => {
 
         {/* Attack Buttons */}
         {game.gameSession?.gameActive && game.gameSession.attackCount < 3 && (
-          <div className="grid grid-cols-1 gap-4 w-full">
+          <div className="grid grid-cols-3 gap-4 w-full">
             {[1, 2, 3].map((attackNum) => (
               <button
                 key={attackNum}
@@ -366,8 +366,8 @@ export const KillBillGameDemo = () => {
 
         {/* Message Display */}
         {game.message && (
-          <div className="bg-black border-4 border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-            <p className="text-yellow-400 font-bold text-center">
+          <div className="max-w-full bg-black border-4 border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <p className="text-yellow-400 font-bold text-center max-w-full">
               {game.message}
             </p>
           </div>
