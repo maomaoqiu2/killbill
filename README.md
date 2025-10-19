@@ -1,3 +1,7 @@
+# **DEMO：**https://killbill.online
+
+
+
 # Kill Bill Game 🎮⚔️
 
 A blockchain-based game powered by Fully Homomorphic Encryption (FHE) where players attempt to defeat Bill through strategic attacks while keeping his health encrypted on-chain.
